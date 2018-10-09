@@ -22,8 +22,6 @@ def connect_sybils(G, num_sybils, stake_sybils, frac_naive, stake_naive, verbose
     random.shuffle(Good_nodes)
     Sybil_nodes = list(range(10000000, 10000000 + num_sybils))
 
-    #assert stake_sybils % 2 == 0 and stake_naive % 2 == 0
-
     # Attach Sybil nodes
     # First links within Sybils
 
@@ -39,7 +37,6 @@ def connect_sybils(G, num_sybils, stake_sybils, frac_naive, stake_naive, verbose
     fraction_of_naive_nodes = frac_naive
     num_naive = int(fraction_of_naive_nodes * len(Good_nodes))
     Naive_nodes = Good_nodes[:num_naive]
-    # print("Naive nodes %s out of %s" % (len(Naive_nodes), len(Good_nodes)))
     Bad_stake = stake_naive
     while Bad_stake > 1:
         s0 = random.choice(Sybil_nodes)
@@ -88,7 +85,6 @@ def compute_targets(Stake_all, Total_stake, node_sets):
             target_stake[s,0] = 0.0
 
     target_dist = target_stake / Total_stake
-    # print(np.sum(target_dist))
     assert round(np.sum(target_dist), 3) == 1.0
     return target_stake, target_dist
 
@@ -108,11 +104,10 @@ def compute_matrix(G, node_sets):
         assert round(W, 2) == 1.0
 
     M = nx.adjacency_matrix(G, Good_nodes + Sybil_nodes)
-    # print("Shape:", M.shape)
     return M
 
 
-def sybil_weights(targets, M, target_dist, Total_stake, walk_len, k=10):
+def sybil_weights(targets, M, target_dist, Total_stake, walk_len, k=0.0001):
     len_targets = len(targets)
 
     t = lil_matrix((M.shape[0], len_targets), dtype=np.float64)
@@ -126,10 +121,19 @@ def sybil_weights(targets, M, target_dist, Total_stake, walk_len, k=10):
     ret = []
 
     for i, target in enumerate(targets):
-        Y = (t[:,i].A - target_dist)
-        Logistic = 1.0 / (1.0 + e**(-k*Total_stake*Y))
+        Y = (t[:,i].A - target_dist) * M.shape[0]
+        y_data_init = list(sorted(Y))    
+        Logistic = 1.0 / (1.0 + e**(-k*Y)) # Total_stake*
         Y = Logistic
         ret += [(target, Y)]
+
+    from matplotlib import pyplot as plt
+    y_data = list(sorted(Y))
+    plt.plot(y_data)
+    #plt.ylim(0.40, 0.60)
+    plt.hlines([0.51, 0.5, 0.49], 0, len(y_data))
+    plt.show()
+
     return ret
 
 def test_all_quorums_for_size(node_q, bad_nodes):
@@ -152,7 +156,6 @@ def test_all_quorums_for_size(node_q, bad_nodes):
 
             # Since a node needs to contain other nodes in its quorum it must
             if new_min > min_quorums[ni]:
-                #print(ni, min_quorums[ni], "->", new_min)
                 min_quorums[ni] = new_min
                 changed = True
                 break
@@ -163,6 +166,22 @@ def test_all_quorums_for_size(node_q, bad_nodes):
         all_good &= min_quorums[ni] > int(math.floor(len_good/2) + 1)
 
     return all_good, ref_quorums, min_quorums, just_good_nodes
+
+def stats_cutoff(Scored_nodes, G, cut_off):
+    orig_good = set([n for n,_, y in Scored_nodes if y >= cut_off])
+    orig_bad = set([n for n,_, y in Scored_nodes if y < cut_off])
+
+    in_good, in_bad, in_between = 0, 0, 0
+    for (u, v) in G.edges:
+        if u in orig_good and v in orig_good:
+            in_good += 1
+        elif u in orig_bad and v in orig_bad:
+            in_bad += 1
+        else:
+            in_between += 1 
+
+    return (cut_off, in_good, len(orig_good), in_bad, len(orig_bad), in_between)
+
 
 
 def main():
@@ -176,6 +195,14 @@ def main():
     Good_stake = sum(v for _, v in deg)
     print("Good Stake: %s" % Good_stake)
 
+    none = {
+        "num_sybils"  : 1 , 
+        "stake_sybils": 0 , 
+        "frac_naive"  : 0.5, 
+        "stake_naive" : 6 
+    }
+
+
     light = {
         "num_sybils"  : int(math.ceil(len(G.nodes)/4)) - 1 , 
         "stake_sybils": int(0.50 * Good_stake / 4) - 1, 
@@ -183,12 +210,28 @@ def main():
         "stake_naive" : int(0.50 * Good_stake / 4 ) - 1 
     }
 
-    fair = {
+    byzantine = {
         "num_sybils"  : int(math.ceil(len(G.nodes)/2)) - 1 , 
         "stake_sybils": int(0.50 * Good_stake / 2) - 1, 
         "frac_naive"  : 1.0, 
         "stake_naive" : int(0.50 * Good_stake / 2 ) - 1 
     }
+
+    fair = {
+        "num_sybils"  : int(math.ceil(len(G.nodes)/2)) - 1 , 
+        "stake_sybils": int(0.50 * Good_stake / 2) - 1, 
+        "frac_naive"  : 0.1, 
+        "stake_naive" : int(0.50 * Good_stake / 2 ) - 1 
+    }
+
+
+    normal = {
+        "num_sybils"  : len(G.nodes), 
+        "stake_sybils": Good_stake , 
+        "frac_naive"  : 0.2, 
+        "stake_naive" : int(0.1 * Good_stake) 
+    }
+
 
     heavy = {
         "num_sybils"  : int(2 * len(G.nodes)) , 
@@ -197,8 +240,7 @@ def main():
         "stake_naive" : int(0.1 * Good_stake) 
     }
 
-    #num_sybils, stake_sybils, frac_naive, stake_naive):
-    G, node_sets = connect_sybils(G, **heavy)
+    G, node_sets = connect_sybils(G, **normal)
     (Good_nodes, Naive_nodes, Sybil_nodes) = node_sets
     num_naive = len(Naive_nodes)
 
@@ -210,23 +252,8 @@ def main():
     print("Walk length: %s" % int(walk_len))
     
     goodlen = len(Good_nodes)
-    logger = []
+    # logger = []
     Good_set = set(Good_nodes)
-
-    # A Confused node connects more to sybils than honest nodes.
-    #confused = set()
-    #for ni in Good_nodes:
-    #    sc_good = 0
-    #    sc_bad  = 0 
-    #    for nj in G[ni]:
-    #        if nj in Good_set:
-    #            sc_good += 1
-    #        else:
-    #            sc_bad += 1
-
-    #    if not (sc_good >= 2 * sc_bad + 1):
-    #        confused.add(ni)
-
 
     all_nodes = Good_nodes + Sybil_nodes
 
@@ -236,20 +263,23 @@ def main():
     targets = random.sample(list(range(goodlen)), Node_samples)
     target_sybils = random.sample(list(range(goodlen, len(all_nodes))), Bad_samples  )
     
-    k = 10
+    k = 1
     print("Logistic: k: %d" % k)
     Dists = sybil_weights(targets, M, target_dist, Total_stake, walk_len, k=k)
-
-    # print("\nNode Health:")
-    #healthy, total = 0, 0 
-
-    #actual_targets = [target for target, Y in Dists]
     
     # Run an analysis to find out who cannot make a good quorum.
     node_q = {}
     bad_nodes = set(target_sybils)
-    cut_off = 0.49
+    cut_off = 0.50
     print("Cutoff: %2.2f" % cut_off)
+
+    # Do a connectivity analysis
+    target_0, Y_0 = Dists[0]
+    Scored_nodes = list(zip(all_nodes, range(len(Y_0)), Y_0))
+
+    for cf in np.arange(0.40, 0.60, 0.01):
+        stats = stats_cutoff(Scored_nodes, G, cut_off=cf)
+        print("%2.2f: %d (%d), %d (%d) : %d" % stats)
 
     for target, Y in Dists:
         node_q[target] = set()
@@ -272,7 +302,6 @@ def main():
             if not len(node_q[ni] - bad_nodes) > 2 * len(node_q[ni] & bad_nodes):
                 bad_nodes.add(ni)
                 new_bad_nodes.add(ni)
-                # print(ni, len(node_q[ni] - bad_nodes), 2 * len(node_q[ni] & bad_nodes))
 
     # print("Total bad nodes: %d out of: %d nodes" % (len(bad_nodes), len(targets + target_sybils)))
     all_good, _, _, just_good_nodes = test_all_quorums_for_size(node_q, bad_nodes)
@@ -285,117 +314,7 @@ def main():
     print("Agreement: %s" % all_good)
     print("  ---------------")
 
-
     return
-
-
-    for target, Y in sorted(Dists):
-
-        # Implement the threshold approach to selecting nodes.
-        cut_off = 0.50
-        selec_good = set()
-        selec_bad  = set()
-        
-        #node_index = dict((node, idx) for idx, node in enumerate(Good_nodes + Sybil_nodes))
-
-        for i in targets + target_sybils:
-            if Y[i] >= cut_off:
-                if i not in bad_nodes:
-                    selec_good.add( all_nodes[i] )
-                else:
-                    selec_bad.add( all_nodes[i] )
-
-        pc_good = 100.0 * float(len(selec_good)) / (len(selec_good) + len(selec_bad))
-
-        # Log the number of nodes that are actually good, 
-        # ie. surrounded by at most 1/3 bad nodes (in stake)
-
-        conf = ["", "*"][all_nodes[target] in confused]
-        no_quorum = ["", "*"][pc_good < 67]
-        
-        total += 1
-        if pc_good > 66:
-            healthy += 1
-
-        logger += [(target, selec_good, selec_bad, all_nodes[target] in confused)]
-
-        # print("--")
-        print("%d%s\t%3d%%%s\t%d\t%d" % (target, conf, pc_good, no_quorum, len(selec_good) + len(selec_bad), len(targets + target_sybils)))
-    
-    print("Overall: %2.2f%% healthy" % (100.0 * float(healthy) / total))
-    print("Confused: %2.2f%%" % (100.0 * len(confused) / len(Good_nodes)))
-    print()
-    print("Quorum Intersection health:")
-    # Test last for quorum intersection
-
-    # (2) Quorum Availability despite B
-
-    V = {n for n in Good_nodes if n not in confused}
-    for (other, other_good, other_bad, other_comp) in logger:
-        conf = [" ", "c"][all_nodes[other] in confused]
-        # print ( len(other_good) > 2 * len(other_bad), conf) 
-
-    # (1) Quorum Intersection despite B
-
-    G = nx.Graph()
-
-    links  =  10 * len(logger)
-    while links > 0:
-        log1, log2 = random.sample(logger, 2)
-        last, last_good, last_bad, last_comp = log1
-        other, other_good, other_bad, other_comp = log2
-
-        if last in bad_nodes or other in bad_nodes:
-            continue    
-
-        links -= 1
-
-        union_size = len(last_good | other_good)
-        z0 = 2 * (len(other_good) + len(other_bad)) / 3 - len(other_bad)
-        z1 = 2 * (len(last_good) + len(last_bad)) / 3 - len(last_bad)
-        # print(z0 > number_just_good / 2 + 1, z1 > number_just_good / 2 + 1,)
-        flag1 = ["!", "-"][len(other_good) > 2 * len(other_bad)]
-        flag2 = ["!", "-"][len(last_good) > 2 * len(other_bad)]
-
-        sum_z = round(z0 + z1)
-        print("%d\t%d\t%s\t%d\t>?\t%d\t%s" % (other, last, sum_z > union_size, sum_z, union_size, flag1+flag2))
-        if sum_z > union_size:
-            G.add_edge(other, last)
-
-    comp = [len(ns) for ns in nx.connected_components(G)] 
-    num_good = len(set(targets + target_sybils) - bad_nodes)
-
-    print(comp, num_good, len(comp) >0 and comp[0] == num_good)
-    print("Missing:", [n for n in targets if n not in bad_nodes and n not in G.nodes])
-    try:
-        print(nx.diameter(G))
-    except:
-        print("No diameter")
-
-
-
-    #    is_quorum = 3* len(other_good) > 2*len(other_good | other_bad) + 1 
-    #    qlen = round(2.0 / 3.0 + max( len(other_good) + len(other_bad),  len(last_good) + len(last_bad)) / 3)
-    #    print(qlen, " < ", len(last_good & other_good), qlen < len(last_good & other_good), is_quorum, len(other_good | other_bad),   last_comp, other_comp, conf)
-
-    if False:
-        naive = Y[:num_naive]
-        honest  = Y[num_naive:goodlen]
-        Sybils = Y[goodlen:]
-
-        bins = np.arange(-0.05, 1.15, 0.1)
-
-        from matplotlib import pyplot as plt
-        fig, axs = plt.subplots(1, 3, sharey=True, tight_layout=True)
-        axs[0].hist(honest, bins=bins, label="Honest")
-        axs[0].title.set_text('Honest')
-        axs[1].hist(naive, bins=bins, label="Naive")
-        axs[1].title.set_text('Naive')
-        axs[2].hist(Sybils, bins=bins, label="Sybils")
-        axs[2].title.set_text('Sybil')
-        plt.show()
-
-        # print(X)
 
 if __name__ == "__main__":
     main() 
