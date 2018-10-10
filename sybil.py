@@ -240,7 +240,7 @@ def main():
         "stake_naive" : int(0.1 * Good_stake) 
     }
 
-    G, node_sets = connect_sybils(G, **normal)
+    G, node_sets = connect_sybils(G, **byzantine)
     (Good_nodes, Naive_nodes, Sybil_nodes) = node_sets
     num_naive = len(Naive_nodes)
 
@@ -270,16 +270,26 @@ def main():
     # Run an analysis to find out who cannot make a good quorum.
     node_q = {}
     bad_nodes = set(target_sybils)
-    cut_off = 0.50
-    print("Cutoff: %2.2f" % cut_off)
-
+    
     # Do a connectivity analysis
     target_0, Y_0 = Dists[0]
     Scored_nodes = list(zip(all_nodes, range(len(Y_0)), Y_0))
 
-    for cf in np.arange(0.40, 0.60, 0.01):
+    actual_cut_off = 0.0
+    for cf in np.arange(0.45, 0.55, 0.01):
         stats = stats_cutoff(Scored_nodes, G, cut_off=cf)
-        print("%2.2f: %d (%d), %d (%d) : %d" % stats)
+        _, in_good, orig_good, in_bad, orig_bad, in_between = stats
+
+        # Define condition:
+        flag_attack = ""
+        if float(in_good) > float(in_between):
+            flag_attack = "xxx"
+            actual_cut_off = cf
+
+        print("%2.2f: %d (%d), %d (%d) : %d %s" % (cf, in_good, orig_good, in_bad, orig_bad, in_between, flag_attack))
+
+    cut_off = actual_cut_off
+    print("Cutoff: %2.2f" % cut_off)
 
     for target, Y in Dists:
         node_q[target] = set()
