@@ -144,7 +144,6 @@ def test_all_quorums_for_size(node_q, bad_nodes):
 
     min_quorums = {}
     for ni in just_good_nodes:
-
         min_quorums[ni] = int(math.floor(2 * (len(node_q[ni])) / 3) + 1 - len(node_q[ni] & bad_nodes))
 
     ref_quorums = min_quorums.copy()       
@@ -163,7 +162,7 @@ def test_all_quorums_for_size(node_q, bad_nodes):
     len_good = len(set(node_q) - bad_nodes)
     all_good = True
     for ni in set(node_q) - bad_nodes:
-        all_good &= min_quorums[ni] > int(math.floor(len_good/2) + 1)
+        all_good &= min_quorums[ni] > int(math.floor(len_good/2))
 
     return all_good, ref_quorums, min_quorums, just_good_nodes
 
@@ -186,14 +185,11 @@ def stats_cutoff(Scored_nodes, G, cut_off):
 
 def main():
     G = nx.read_edgelist("samples/small_net2.txt", nodetype=int, create_using=nx.DiGraph())
+
     deg = G.out_degree()
-
-    seed = int(1000000 * random.random())
-    print("Random seed: %s" % seed)
-    random.seed(seed)
-
     Good_stake = sum(v for _, v in deg)
     print("Good Stake: %s" % Good_stake)
+
 
     none = {
         "num_sybils"  : 1 , 
@@ -240,7 +236,14 @@ def main():
         "stake_naive" : int(0.1 * Good_stake) 
     }
 
+
+    seed = int(1000000 * random.random())
+    print("Random seed: %s" % seed)
+    random.seed(seed)
+
     G, node_sets = connect_sybils(G, **byzantine)
+
+    
     (Good_nodes, Naive_nodes, Sybil_nodes) = node_sets
     num_naive = len(Naive_nodes)
 
@@ -252,7 +255,6 @@ def main():
     print("Walk length: %s" % int(walk_len))
     
     goodlen = len(Good_nodes)
-    # logger = []
     Good_set = set(Good_nodes)
 
     all_nodes = Good_nodes + Sybil_nodes
@@ -281,12 +283,8 @@ def main():
         _, in_good, orig_good, in_bad, orig_bad, in_between = stats
 
         # Define condition:
-        flag_attack = ""
         if float(in_good) > float(in_between):
-            flag_attack = "xxx"
             actual_cut_off = cf
-
-        print("%2.2f: %d (%d), %d (%d) : %d %s" % (cf, in_good, orig_good, in_bad, orig_bad, in_between, flag_attack))
 
     cut_off = actual_cut_off
     print("Cutoff: %2.2f" % cut_off)
@@ -299,8 +297,6 @@ def main():
 
         n_good = len([n for n in node_q[target] if n not in bad_nodes])
         n_all = len(node_q[target])
-
-        print(target, n_all, "%2.2f" % (100*n_good/n_all))
     
 
     new_bad_nodes = bad_nodes | set()
@@ -313,18 +309,19 @@ def main():
                 bad_nodes.add(ni)
                 new_bad_nodes.add(ni)
 
-    # print("Total bad nodes: %d out of: %d nodes" % (len(bad_nodes), len(targets + target_sybils)))
     all_good, _, _, just_good_nodes = test_all_quorums_for_size(node_q, bad_nodes)
-    print(all_good, len(just_good_nodes))
+    
+    out_good = len(just_good_nodes)
+    out_confused = (Node_samples - len(just_good_nodes))
 
     print("  --- Results ---")
-    print("Pure Good: %d" % len(just_good_nodes))
-    print(" Confused: %d" % (Node_samples - len(just_good_nodes)))
+    print("Pure Good: %d" % out_good)
+    print(" Confused: %d" % out_confused    )
     print("   Sybils: %d" % Bad_samples)
     print("Agreement: %s" % all_good)
     print("  ---------------")
 
-    return
+    return out_good, out_confused, Bad_samples, all_good
 
 if __name__ == "__main__":
     main() 
