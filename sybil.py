@@ -243,85 +243,85 @@ def main():
 
     G, node_sets = connect_sybils(G, **byzantine)
 
-    
-    (Good_nodes, Naive_nodes, Sybil_nodes) = node_sets
-    num_naive = len(Naive_nodes)
+    def experiment(G, node_sets):    
+        (Good_nodes, Naive_nodes, Sybil_nodes) = node_sets
+        num_naive = len(Naive_nodes)
 
-    Total_stake, Stake_all, _ = state_stats(G, node_sets)
-    target_stake, target_dist = compute_targets(Stake_all, Total_stake, node_sets)
-    M = compute_matrix(G, node_sets)
+        Total_stake, Stake_all, _ = state_stats(G, node_sets)
+        target_stake, target_dist = compute_targets(Stake_all, Total_stake, node_sets)
+        M = compute_matrix(G, node_sets)
 
-    walk_len = 15 * log(M.shape[0]) / log(3)
-    print("Walk length: %s" % int(walk_len))
-    
-    goodlen = len(Good_nodes)
-    Good_set = set(Good_nodes)
+        walk_len = 15 * log(M.shape[0]) / log(3)
+        print("Walk length: %s" % int(walk_len))
+        
+        goodlen = len(Good_nodes)
+        Good_set = set(Good_nodes)
 
-    all_nodes = Good_nodes + Sybil_nodes
+        all_nodes = Good_nodes + Sybil_nodes
 
-    Node_samples = 50
-    Bad_samples = int(math.ceil(Node_samples * (len(all_nodes) - goodlen) / len(Good_nodes))) - 1
-    print("Initial honest: %s" % Node_samples)
-    targets = random.sample(list(range(goodlen)), Node_samples)
-    target_sybils = random.sample(list(range(goodlen, len(all_nodes))), Bad_samples  )
-    
-    k = 1
-    print("Logistic: k: %d" % k)
-    Dists = sybil_weights(targets, M, target_dist, Total_stake, walk_len, k=k)
-    
-    # Run an analysis to find out who cannot make a good quorum.
-    node_q = {}
-    bad_nodes = set(target_sybils)
-    
-    # Do a connectivity analysis
-    target_0, Y_0 = Dists[0]
-    Scored_nodes = list(zip(all_nodes, range(len(Y_0)), Y_0))
+        Node_samples = 50
+        Bad_samples = int(math.ceil(Node_samples * (len(all_nodes) - goodlen) / len(Good_nodes))) - 1
+        print("Initial honest: %s" % Node_samples)
+        targets = random.sample(list(range(goodlen)), Node_samples)
+        target_sybils = random.sample(list(range(goodlen, len(all_nodes))), Bad_samples  )
+        
+        k = 1
+        print("Logistic: k: %d" % k)
+        Dists = sybil_weights(targets, M, target_dist, Total_stake, walk_len, k=k)
+        
+        # Run an analysis to find out who cannot make a good quorum.
+        node_q = {}
+        bad_nodes = set(target_sybils)
+        
+        # Do a connectivity analysis
+        target_0, Y_0 = Dists[0]
+        Scored_nodes = list(zip(all_nodes, range(len(Y_0)), Y_0))
 
-    actual_cut_off = 0.0
-    for cf in np.arange(0.45, 0.55, 0.01):
-        stats = stats_cutoff(Scored_nodes, G, cut_off=cf)
-        _, in_good, orig_good, in_bad, orig_bad, in_between = stats
+        actual_cut_off = 0.0
+        for cf in np.arange(0.45, 0.55, 0.01):
+            stats = stats_cutoff(Scored_nodes, G, cut_off=cf)
+            _, in_good, orig_good, in_bad, orig_bad, in_between = stats
 
-        # Define condition:
-        if float(in_good) > float(in_between):
-            actual_cut_off = cf
+            # Define condition:
+            if float(in_good) > float(in_between):
+                actual_cut_off = cf
 
-    cut_off = actual_cut_off
-    print("Cutoff: %2.2f" % cut_off)
+        cut_off = actual_cut_off
+        print("Cutoff: %2.2f" % cut_off)
 
-    for target, Y in Dists:
-        node_q[target] = set()
-        for i in targets + target_sybils:
-            if Y[i] >= cut_off:
-                node_q[target].add( i )
+        for target, Y in Dists:
+            node_q[target] = set()
+            for i in targets + target_sybils:
+                if Y[i] >= cut_off:
+                    node_q[target].add( i )
 
-        n_good = len([n for n in node_q[target] if n not in bad_nodes])
-        n_all = len(node_q[target])
-    
+            n_good = len([n for n in node_q[target] if n not in bad_nodes])
+            n_all = len(node_q[target])
+        
 
-    new_bad_nodes = bad_nodes | set()
-    while len(new_bad_nodes) > 0:
-        old_bad_nodes = new_bad_nodes
-        new_bad_nodes = set()
+        new_bad_nodes = bad_nodes | set()
+        while len(new_bad_nodes) > 0:
+            old_bad_nodes = new_bad_nodes
+            new_bad_nodes = set()
 
-        for ni in set(node_q) - bad_nodes:
-            if not len(node_q[ni] - bad_nodes) > 2 * len(node_q[ni] & bad_nodes):
-                bad_nodes.add(ni)
-                new_bad_nodes.add(ni)
+            for ni in set(node_q) - bad_nodes:
+                if not len(node_q[ni] - bad_nodes) > 2 * len(node_q[ni] & bad_nodes):
+                    bad_nodes.add(ni)
+                    new_bad_nodes.add(ni)
 
-    all_good, _, _, just_good_nodes = test_all_quorums_for_size(node_q, bad_nodes)
-    
-    out_good = len(just_good_nodes)
-    out_confused = (Node_samples - len(just_good_nodes))
+        all_good, _, _, just_good_nodes = test_all_quorums_for_size(node_q, bad_nodes)
+        
+        out_good = len(just_good_nodes)
+        out_confused = (Node_samples - len(just_good_nodes))
 
-    print("  --- Results ---")
-    print("Pure Good: %d" % out_good)
-    print(" Confused: %d" % out_confused    )
-    print("   Sybils: %d" % Bad_samples)
-    print("Agreement: %s" % all_good)
-    print("  ---------------")
+        print("  --- Results ---")
+        print("Pure Good: %d" % out_good)
+        print(" Confused: %d" % out_confused    )
+        print("   Sybils: %d" % Bad_samples)
+        print("Agreement: %s" % all_good)
+        print("  ---------------")
 
-    return out_good, out_confused, Bad_samples, all_good
+        return out_good, out_confused, Bad_samples, all_good
 
 if __name__ == "__main__":
     main() 
