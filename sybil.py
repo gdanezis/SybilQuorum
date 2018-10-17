@@ -164,7 +164,7 @@ def test_all_quorums_for_size(node_q, bad_nodes):
     len_good = len(set(node_q) - bad_nodes)
     all_good = 0
     for ni in set(node_q) - bad_nodes:
-        print(ni, min_quorums[ni], int(math.floor(len_good/2)))
+        # print(ni, min_quorums[ni], int(math.floor(len_good/2)))
         if min_quorums[ni] > int(math.floor(len_good/2)):
             all_good += 1 
 
@@ -201,7 +201,7 @@ def experiment(G, node_sets, Node_samples = 100, k = 1):
     target_stake, target_dist = compute_targets(Stake_all, Total_stake, node_sets)
     M = compute_matrix(G, node_sets)
 
-    walk_len =  15 * (log(M.shape[0]) / log(3))
+    walk_len =  10 * (log(M.shape[0]) / log(4))
     print("Walk length: %s" % int(walk_len))
     
     goodlen = len(Good_nodes)
@@ -242,14 +242,14 @@ def experiment(G, node_sets, Node_samples = 100, k = 1):
     dnodes = round(lgood/(lbad+0.000001),4)
     dlinks = round( 2*in_good/(in_between + 0.000001) ,4)
 
-    if float(in_good) > float(in_between)/2 and dnodes - dlinks < 1.0:
+    if float(in_good) > float(in_between)/2 or dnodes - dlinks < 1.0:
         cut_off = 0.5
         flag = "*"
     else:
         cut_off = 0.0
         flag = " "
 
-    print("%2.3f\t%d\t%d\t%d\t%d\t%2.2f\t%2.2f\t%s" % (0.5, lgood, lbad, in_good, in_between, round(fp,3), round(fn,3), flag))
+    print("%2.3f\t%d\t%d\t%d\t%d\t%2.2f\t%2.2f\t%s" % (0.5, lgood, lbad, in_good, in_between/2, round(fp,3), round(fn,3), flag))
     print(dnodes, dlinks, round(dnodes - dlinks, 2))
 
     print("Cutoff: %2.3f" % cut_off)
@@ -282,6 +282,8 @@ def experiment(G, node_sets, Node_samples = 100, k = 1):
             if not len(node_q[ni] - bad_nodes) > 2 * len(node_q[ni] & bad_nodes):
                 bad_nodes.add(ni)
                 new_bad_nodes.add(ni)
+                #print("kill %s              %s > %s" % (ni, len(node_q[ni] - bad_nodes), 2 * len(node_q[ni] & bad_nodes)))
+        #print("Bad nodes: %s" % len(bad_nodes))
 
     all_good, _, _, just_good_nodes = test_all_quorums_for_size(node_q, bad_nodes)
     
@@ -359,10 +361,10 @@ def main():
     }
 
     normal = {
-        "num_sybils"  : len(G.nodes), 
-        "stake_sybils": int(0.85 * Good_stake) , 
-        "frac_naive"  : 0.3, 
-        "stake_naive" : int(0.15 * Good_stake) 
+        "num_sybils"  : int(0.5 * len(G.nodes) + 10), 
+        "stake_sybils": int(0.90 * Good_stake) , 
+        "frac_naive"  : 0.1, 
+        "stake_naive" : int(0.1 * Good_stake) 
     }
 
     normal_bad = {

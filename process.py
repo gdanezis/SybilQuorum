@@ -12,7 +12,7 @@ for fname in arr:
 
     while True:
         D = G.out_degree()
-        nodes_to_remove = [n for n, d  in D if d < 3]
+        nodes_to_remove = [n for n, d  in D if d < 4]
         if len(nodes_to_remove) == 0:
             break
         G.remove_nodes_from(nodes_to_remove)
