@@ -236,25 +236,6 @@ def experiment(G, node_sets, Node_samples = 100, k = 1):
 
     Scored_nodes = list(zip(all_nodes, range(len(Y_0)), Y_0))
 
-    actual_cut_off = 0.0
-    #prev_in_between = None
-    #for cf in np.arange(0.49, 0.51, 0.001):
-    #    stats = stats_cutoff(Scored_nodes, G, cut_off=cf, Sybil_nodes=Sybil_nodes)
-    #    _, lgood, lbad, in_good, orig_good, in_bad, orig_bad, in_between, fp, fn = stats
-    #
-    #    dnodes = round(lgood/(lbad+0.000001),4)
-    #    dlinks = round( 2*in_good/(in_between + 0.000001) ,4)
-    #
-    #    # Define condition:
-    #    flag = " "
-    #    if float(in_good) > float(in_between)/2 and dnodes - dlinks < 0:
-    #        flag = "*"
-    #        if actual_cut_off == 0.0:
-    #            actual_cut_off = cf
-    #            
-    #   
-    #    print("%2.3f\t%d\t%d\t%d\t%d\t%2.2f\t%2.2f\t%s" % (cf, lgood, lbad, in_good, in_between, round(fp,3), round(fn,3), flag))
-    #    print(dnodes, dlinks, round(dnodes - dlinks, 2))
 
     stats = stats_cutoff(Scored_nodes, G, cut_off=0.5, Sybil_nodes=Sybil_nodes)
     _, lgood, lbad, in_good, orig_good, in_bad, orig_bad, in_between, fp, fn = stats
@@ -262,17 +243,15 @@ def experiment(G, node_sets, Node_samples = 100, k = 1):
     dlinks = round( 2*in_good/(in_between + 0.000001) ,4)
 
     if float(in_good) > float(in_between)/2 and dnodes - dlinks < 1.0:
-        actual_cut_off = 0.5
+        cut_off = 0.5
         flag = "*"
     else:
-        actual_cut_off = 0.0
+        cut_off = 0.0
         flag = " "
 
     print("%2.3f\t%d\t%d\t%d\t%d\t%2.2f\t%2.2f\t%s" % (0.5, lgood, lbad, in_good, in_between, round(fp,3), round(fn,3), flag))
     print(dnodes, dlinks, round(dnodes - dlinks, 2))
 
-
-    cut_off = actual_cut_off
     print("Cutoff: %2.3f" % cut_off)
 
     for target, Y in Dists:
