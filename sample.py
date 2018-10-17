@@ -7,7 +7,7 @@ def make_sample_net(num=1):
 
     N = 30622564
     targets = set()
-    while len(targets) < 200000:
+    while len(targets) < 150000:
         v = random.randint(1, N)
         targets.add(v)
             
@@ -22,5 +22,5 @@ def make_sample_net(num=1):
 
     f2.close()
 
-for x in range(2, 10):
+for x in range(1, 2):
     make_sample_net(x)
